@@ -8,3 +8,11 @@
 .form details summary{padding:8px 0}
 .card .row{flex-wrap:wrap}
 @media(max-width:420px){.map-overlay{padding:5px}.map-dialog{padding:12px;border-radius:16px}.card .btn.sm{font-size:11px;padding:9px}}
+
+/* Detailed preference filters */
+.filter-block{border:1px solid #f0e4d8;border-radius:18px;background:#fffdfa;padding:14px;margin:20px 0}
+.filter-step{font-size:12px;font-weight:900;letter-spacing:.5px;color:#e46a23;border-bottom:1px solid #f4e6d9;padding-bottom:10px}
+.filter-block label{margin-top:17px}
+.filter-block .chip{line-height:1.35;min-height:42px}
+.filter-block .muted{line-height:1.55;margin:8px 0 0}
+@media(max-width:390px){.filter-block{padding:11px}.filter-block .chips{gap:6px}.filter-block .chip{padding:9px 11px;font-size:11px}}
