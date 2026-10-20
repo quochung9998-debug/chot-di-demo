@@ -16,3 +16,19 @@
 .filter-block .chip{line-height:1.35;min-height:42px}
 .filter-block .muted{line-height:1.55;margin:8px 0 0}
 @media(max-width:390px){.filter-block{padding:11px}.filter-block .chips{gap:6px}.filter-block .chip{padding:9px 11px;font-size:11px}}
+
+/* Wikimedia food-photo gallery */
+.photo-box{width:100%;aspect-ratio:4/3;border-radius:14px;position:relative;overflow:hidden;background:linear-gradient(130deg,#fce7ce,#fff7ed);display:flex;align-items:center;justify-content:center;margin:0 0 12px}
+.photo-box .photo-emoji{font-size:48px;filter:drop-shadow(0 3px 8px #7d4f1f30)}
+.photo-box img{width:100%;height:100%;position:absolute;inset:0;object-fit:cover;display:block}
+.photo-box.large{aspect-ratio:16/11;max-width:440px;margin:0 auto 18px;border-radius:18px}
+.photo-box.large .photo-emoji{font-size:96px}
+.food-grid .food-card{padding:10px;min-width:0;display:flex;flex-direction:column;align-items:stretch}
+.food-card strong{font-size:14px;line-height:1.4}
+.food-card .btn{margin-top:auto;align-self:flex-start}
+.food-card p{margin:4px 0 9px}
+.origin-panel h3{margin:0 0 6px}
+.origin-panel p{margin:6px 0 10px}
+.food-credit{font-size:11px;color:#968272;overflow-wrap:anywhere;border-top:1px solid #f1e6da;margin-top:12px;padding-top:10px}
+.food-credit a{color:#df601e;text-decoration:underline}
+@media(max-width:375px){.food-card strong{font-size:12px}.photo-box .photo-emoji{font-size:34px}}
