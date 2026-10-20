@@ -140,21 +140,110 @@ function openGoogleMaps(){
 }
 
 const VENUES=["Bếp Ngon Góc Phố","Quán Nhà Mình","Bếp Xinh Sài Gòn","Góc Ăn Trưa","Tiệm Ăn Vui Vẻ","Bếp Nhỏ Hôm Nay","Quán Ăn Quen","Góc Bếp Ấm","Bếp Tươi Mỗi Ngày","Tiệm Cơm Thân Quen","Món Ngon Gần Nhà","Ngõ Ẩm Thực","Bếp Chọn Đi","Bữa Trưa 365","Quán Thương Nhớ","Tiệm Ăn Phố","Bếp Hẹn Hò","Góc Ăn Nhanh","Bếp Chiều Nay","Món Ngon Mỗi Ngày","Quán Bình Dân","Bếp Lạ","Tiệm Vị Nhà","Quán Hợp Gu","Bếp Ở Đây"];
+
+/* Curated demo tags: broad ingredients, not verified recipes or allergy guarantees. */
+const FOOD_META=[
+["man","nuoc",["bo"]],["man","nuoc",["ga"]],["man","nuoc",["bo"]],["man","nuoc",["hai-san"]],
+["man","nuoc",["heo"]],["man","nuoc",["heo"]],["man","nuoc",["hai-san"]],["man","kho",["heo"]],
+["man","kho",["heo"]],["man","kho",["ga"]],["man","kho",["hai-san"]],["man","kho",["bo"]],
+["man","kho",["heo"]],["chay","kho",["chay"]],["man","kho",["hai-san","heo"]],
+["man","kho",["hai-san"]],["man","kho",["heo"]],["man","kho",["ga"]],
+["chay","kho",["chay"]],["chay","nuoc",["chay"]],["chay","kho",["chay"]],
+["chay","kho",["chay"]],["man","kho",["heo"]],["man","nuoc",["hai-san"]],
+["chay","nuoc",["chay"]],["chay","kho",["chay"]],["man","kho",["ga"]],
+["man","kho",["bo"]],["man","kho",["heo"]],["man","nuoc",["heo"]],
+["man","nuoc",["hai-san"]],["man","kho",["hai-san"]],["man","kho",["hai-san"]],
+["chay","kho",["chay"]],["man","nuoc",["hai-san"]],["man","kho",["heo"]]
+];
+DISHES.forEach((d,i)=>{
+ const [diet,texture,ingredients]=FOOD_META[i];
+ d.diet=diet;d.texture=texture;d.ingredients=ingredients;
+});
+const foodLabels={bo:"Thịt bò",heo:"Thịt heo",ga:"Thịt gà","hai-san":"Cá / hải sản"};
 const STORAGE_KEY="chotdi-demo-v1";
 const read=()=>{try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}}catch{return {}}};
 const stored=read();
-const state={screen:"home",area:stored.area||"Quận 3",budget:stored.budget||70000,category:"all",spicy:false,veg:false,distance:3,people:1,time:30,last:null,history:stored.history||[],favorites:stored.favorites||[],excluded:[],gps:"",notice:""};
+const state={
+ screen:"home",area:stored.area||"Quận 3",budget:stored.budget||70000,
+ category:"all",diet:"all",texture:"all",heat:"all",avoid:[],
+ distance:3,people:1,time:30,last:null,
+ history:stored.history||[],favorites:stored.favorites||[],excluded:[],gps:"",notice:""
+};
 const money=n=>Number(n).toLocaleString("vi-VN")+"đ";
 const save=()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify({area:state.area,budget:state.budget,history:state.history,favorites:state.favorites}))}catch{}};
 const app=document.querySelector("#app");
 function nav(page){state.screen=page;render();window.scrollTo({top:0,behavior:"instant"})}
-function set(k,v){state[k]=v;if(k==="area"||k==="budget")save();render()}
-function reset(){state.category="all";state.spicy=false;state.veg=false;state.budget=70000;state.excluded=[];nav("filters")}
-function pool(){return DISHES.filter(d=>d.price<=state.budget&&(state.category==="all"||d.category===state.category)&&(!state.veg||d.tags.includes("chay"))&&(!state.spicy||d.spicy))}
-function choose(){let p=pool();if(!p.length){state.notice="Không tìm thấy món phù hợp. Hãy tăng ngân sách hoặc nới bộ lọc.";nav("filters");return}let fresh=p.filter(d=>!state.excluded.includes(d.id));if(!fresh.length){state.excluded=[];fresh=p}const item=fresh[Math.floor(Math.random()*fresh.length)];state.excluded.push(item.id);state.last=item.id;state.notice="";state.history.unshift({id:item.id,at:new Date().toISOString(),area:state.area});state.history=state.history.slice(0,30);save();nav("result")}
+function set(k,v){state[k]=v;state.notice="";if(k==="area"||k==="budget")save();render()}
+function reset(){Object.assign(state,{category:"all",diet:"all",texture:"all",heat:"all",avoid:[],budget:70000,excluded:[],notice:""});save();render()}
+function toggleAvoid(key){state.avoid=state.avoid.includes(key)?state.avoid.filter(x=>x!==key):[...state.avoid,key];state.notice="";render()}
+function pool(){
+ return DISHES.filter(d=>
+   d.price<=state.budget &&
+   (state.category==="all"||d.category===state.category) &&
+   (state.diet==="all"||d.diet===state.diet) &&
+   (state.texture==="all"||d.texture===state.texture) &&
+   (state.heat==="all"||(state.heat==="spicy"?d.spicy:!d.spicy)) &&
+   !state.avoid.some(key=>d.ingredients.includes(key))
+ );
+}
+function choose(){
+ const available=pool();
+ if(!available.length){state.notice="Không còn món phù hợp với toàn bộ điều kiện. Hãy bỏ bớt nguyên liệu cần tránh, đổi dạng món hoặc tăng ngân sách.";nav("filters");return}
+ let fresh=available.filter(d=>!state.excluded.includes(d.id));
+ if(!fresh.length){state.excluded=[];fresh=available}
+ const item=fresh[Math.floor(Math.random()*fresh.length)];
+ state.excluded.push(item.id);state.last=item.id;state.notice="";
+ state.history.unshift({id:item.id,at:new Date().toISOString(),area:state.area});
+ state.history=state.history.slice(0,30);save();nav("result");
+}
 function current(){return DISHES.find(d=>d.id===state.last)}
 function fav(id){state.favorites=state.favorites.includes(id)?state.favorites.filter(x=>x!==id):[...state.favorites,id];save();render()}
-function filterPage(){return '<section class="page"><div class="eyebrow">Bước 1 / 2 • Chọn nhu cầu</div><h2>Hôm nay bạn muốn <span class="accent">ăn gì?</span></h2><p>Chọn nhanh vài thông tin. CHỐT ĐI sẽ gợi ý 1 món phù hợp thay vì để bạn tìm mãi.</p>'+ (state.notice?'<div class="alert">'+state.notice+'</div>':'')+'<div class="form"><label for="area">📍 Khu vực bạn muốn ăn</label><select id="area">'+AREAS.map(a=>'<option '+(a===state.area?'selected':'')+'>'+a+'</option>').join("")+'</select>'+locationSummary()+'<label>💰 Ngân sách tối đa / người: <span class="accent" id="budget-val">'+money(state.budget)+'</span></label><input aria-label="Ngân sách" id="budget" type="range" min="30000" max="200000" step="5000" value="'+state.budget+'"/><div class="row between muted"><span>30.000đ</span><span>200.000đ</span></div><label>🍴 Loại món</label><div class="chips">'+[["all","Tất cả"],["com","Cơm & bún"],["nuoc","Món nước"],["nhanh","Ăn nhanh"],["chay","Ăn chay"],["nhom","Ăn cùng nhóm"]].map(([x,t])=>'<button class="chip '+(state.category===x?'selected':'')+'" data-category="'+x+'">'+t+'</button>').join("")+'</div><label>🥗 Chế độ ăn</label><div class="chips"><button class="chip '+(state.veg?'selected':'')+'" id="veg">Chỉ món chay</button><button class="chip '+(state.spicy?'selected':'')+'" id="spicy">Thích món cay</button></div><label>📏 Bán kính tìm quán (tùy chọn demo)</label><div class="segment">'+[1,3,5,10].map(n=>'<button data-distance="'+n+'" class="'+(state.distance===n?'selected':'')+'">'+n+' km</button>').join("")+'</div><div class="summary">Có <b>'+pool().length+' món</b> phù hợp bộ lọc. Bán kính và GPS chỉ mang tính minh họa; dữ liệu quán demo không được xác minh.</div><button class="btn full" id="choose">CHỐT MÓN NGAY →</button></div></section>'}
+function optionButtons(field,options){
+ return '<div class="chips">'+options.map(([value,title])=>
+ '<button type="button" class="chip '+(state[field]===value?"selected":"")+'" data-pref="'+field+'" data-value="'+value+'" aria-pressed="'+(state[field]===value)+'">'+title+'</button>'
+ ).join("")+'</div>';
+}
+function filterPage(){
+ const matched=pool().length;
+ return '<section class="page">'+
+ '<div class="eyebrow">Bước 1 / 2 • Cá nhân hóa nhu cầu</div>'+
+ '<h2>Bạn muốn ăn <span class="accent">món như thế nào?</span></h2>'+
+ '<p>Chọn càng đúng nhu cầu, CHỐT ĐI càng dễ đề xuất một món hợp ý.</p>'+
+ (state.notice?'<div class="alert" role="status">'+state.notice+'</div>':'')+
+ '<div class="form">'+
+ '<label for="area">📍 Khu vực muốn ăn</label>'+
+ '<select id="area">'+AREAS.map(a=>'<option '+(a===state.area?"selected":"")+'>'+a+'</option>').join("")+'</select>'+
+ locationSummary()+
+ '<div class="filter-block"><div class="filter-step">1 • Yêu cầu bắt buộc</div>'+
+ '<label>🥬 Chế độ ăn</label>'+
+ optionButtons("diet",[["all","Không giới hạn"],["man","Ăn mặn"],["chay","Ăn chay"]])+
+ '<p class="muted">Chọn “Ăn chay” sẽ loại tất cả món gắn nhãn thịt/cá trong bộ dữ liệu demo.</p>'+
+ '<label>🍜 Dạng món</label>'+
+ optionButtons("texture",[["all","Bất kỳ"],["kho","Món khô"],["nuoc","Món nước"]])+
+ '<label>🚫 Không muốn ăn nguyên liệu nào?</label>'+
+ '<div class="chips">'+Object.entries(foodLabels).map(([key,label])=>
+ '<button type="button" class="chip '+(state.avoid.includes(key)?"selected":"")+'" data-avoid="'+key+'" aria-pressed="'+state.avoid.includes(key)+'">'+(state.avoid.includes(key)?"✓ ":"")+label+'</button>'
+ ).join("")+'</div>'+
+ '<p class="muted">Đây là bộ lọc sở thích dựa trên nguyên liệu chính; không dùng để bảo đảm an toàn dị ứng hoặc ăn chay nghiêm ngặt.</p>'+
+ '<label>🌶️ Mức độ cay</label>'+
+ optionButtons("heat",[["all","Không quan trọng"],["no","Không cay"],["spicy","Có cay"]])+
+ '<label for="budget">💰 Ngân sách tối đa/người: <span class="accent" id="budget-val">'+money(state.budget)+'</span></label>'+
+ '<input aria-label="Ngân sách" id="budget" type="range" min="30000" max="200000" step="5000" value="'+state.budget+'"/>'+
+ '<div class="row between muted"><span>30.000đ</span><span>200.000đ</span></div></div>'+
+ '<div class="filter-block"><div class="filter-step">2 • Sở thích thêm</div>'+
+ '<label>🍽️ Nhóm món</label>'+
+ optionButtons("category",[["all","Tất cả"],["com","Cơm & bún"],["nuoc","Món nước"],["nhanh","Ăn nhanh"],["chay","Nhóm món chay"],["nhom","Ăn cùng nhóm"]])+
+ '<label>📏 Bán kính tìm quán (tham khảo)</label>'+
+ '<div class="segment">'+[1,3,5,10].map(n=>
+ '<button type="button" data-distance="'+n+'" class="'+(state.distance===n?"selected":"")+'">'+n+' km</button>'
+ ).join("")+'</div></div>'+
+ '<div class="summary" aria-live="polite"><b>'+matched+' / '+DISHES.length+' món</b> phù hợp với các bộ lọc.'+
+ (matched===0?'<p style="margin:6px 0 0">Hãy thử chọn “Bất kỳ”, “Không giới hạn” hoặc tăng ngân sách để có thêm món.</p>':'')+
+ '<p style="margin:5px 0 0">Bán kính sẽ dùng khi tìm quán; chưa giới hạn kết quả Google Maps miễn phí.</p></div>'+
+ '<button class="btn full" id="choose" '+(!matched?"disabled":"")+'>CHỐT MÓN NGAY →</button>'+
+ '<button class="btn ghost full" style="margin-top:10px" id="reset-filters">Đặt lại bộ lọc</button>'+
+ '</div></section>';
+}
 function home(){return '<section class="page"><div class="hero"><div class="eyebrow">Ứng dụng chốt món thông minh</div><div class="food-art">🍜🥢</div><h1>Hôm nay <span class="accent">ăn gì?</span><br/>Để <span class="accent">CHỐT ĐI!</span></h1><p>Chọn ngân sách, khẩu vị và khu vực. Một chạm để biết món gì hợp hôm nay.</p><button class="btn full" id="start">CHỐT NGAY →</button></div><div class="eyebrow">3 bước đơn giản</div><div class="grid"><div class="feature"><div class="emoji">📍</div><strong>1. Chọn nhu cầu</strong><p>Ngân sách, khu vực, sở thích</p></div><div class="feature"><div class="emoji">🎲</div><strong>2. Chốt một món</strong><p>Gợi ý nhanh, không đau đầu</p></div><div class="feature"><div class="emoji">🍽️</div><strong>3. Tìm quán</strong><p>Tham khảo quán và mở Maps</p></div><div class="feature"><div class="emoji">♡</div><strong>4. Lưu lại</strong><p>Giữ món ngon cho lần sau</p></div></div><div class="card tint"><h3>CHỐT ĐI khác gì tìm kiếm thông thường?</h3><p style="margin-bottom:0">Thay vì hiện hàng trăm lựa chọn, chúng tôi giúp bạn <b>ra một quyết định trước</b>, sau đó mới tìm địa điểm.</p></div><p class="fine">Bản demo sử dụng món ăn và quán mô phỏng phục vụ thử nghiệm ý tưởng.</p></section>'}
 function result(){const d=current();if(!d)return home();return '<section class="page"><div class="eyebrow">Bước 2 / 2 • Đã chốt!</div><div class="result"><span class="big-emoji">'+d.emoji+'</span><div class="mini">MÓN ĂN DÀNH CHO BẠN</div><h1>'+d.name+'</h1><p>'+d.description+'</p><div class="price">Khoảng '+money(d.price)+'</div><div class="info"><span class="tag">📍 '+state.area+'</span><span class="tag">💰 ≤ '+money(state.budget)+'</span>'+(d.spicy?'<span class="tag">🌶️ Có vị cay</span>':'')+'</div></div><div class="row"><button class="btn full" id="venues">TÌM QUÁN ĂN →</button><button class="icon-btn" id="heart" aria-label="Yêu thích">'+(state.favorites.includes(d.id)?'♥':'♡')+'</button></div><button class="btn ghost full" style="margin-top:10px" id="again">⟳ Không thích? CHỐT LẠI</button><button class="btn ghost full" style="margin-top:10px" id="edit">Sửa bộ lọc</button><p class="fine">Giá chỉ là ước tính minh họa, không phải giá bán được xác minh.</p></section>'}
 function places(){
@@ -171,5 +260,5 @@ function places(){
 function collection(kind){const hs=kind==="history"?state.history.map(v=>({...v,d:DISHES.find(d=>d.id===v.id)})):state.favorites.map(id=>({id,d:DISHES.find(d=>d.id===id)}));const title=kind==="history"?"Lịch sử CHỐT":"Món yêu thích";return '<section class="page"><div class="eyebrow">Bộ sưu tập của bạn</div><h2>'+title+'</h2><p>'+(kind==="history"?"Các món bạn từng CHỐT, lưu trên thiết bị hiện tại.":"Danh sách món bạn đã thả tim, lưu trên thiết bị hiện tại.")+'</p>'+(hs.length?hs.filter(x=>x.d).map(v=>'<div class="card item"><span class="icon">'+v.d.emoji+'</span><div class="text"><h3>'+v.d.name+'</h3><p>'+money(v.d.price)+(v.at?' · '+new Date(v.at).toLocaleDateString("vi-VN"):'')+'</p></div><button class="btn sm ghost" data-view="'+v.d.id+'">Xem →</button></div>').join(""):'<div class="empty"><div class="big">🍜</div><h3>Chưa có món nào</h3><p>Hãy bắt đầu CHỐT một món để lưu vào đây.</p><button class="btn" id="start">CHỐT NGAY</button></div>')+'</section>'}
 function explore(){return '<section class="page"><div class="eyebrow">Khám phá ẩm thực</div><h2>36 món ăn, <span class="accent">tha hồ CHỐT</span></h2><p>Khám phá danh sách món trong bản demo. Dữ liệu và giá chỉ dùng để mô phỏng.</p><div class="grid">'+DISHES.map(d=>'<div class="feature"><div class="emoji">'+d.emoji+'</div><strong>'+d.name+'</strong><p style="margin-bottom:9px">'+money(d.price)+'</p><button class="btn ghost sm" data-view="'+d.id+'">Xem món</button></div>').join("")+'</div></section>'}
 function render(){app.innerHTML=state.screen==="home"?home():state.screen==="filters"?filterPage():state.screen==="result"?result():state.screen==="venues"?places():state.screen==="explore"?explore():state.screen==="history"?collection("history"):collection("favorites");document.querySelectorAll("[data-nav]").forEach(b=>b.classList.toggle("active",b.dataset.nav===state.screen||(state.screen==="filters"||state.screen==="result"||state.screen==="venues")&&b.dataset.nav==="home"));bind()}
-function bind(){const on=(id,cb)=>{const el=document.getElementById(id);if(el)el.addEventListener("click",cb)};on("start",()=>nav("filters"));on("choose",choose);on("again",choose);on("edit",()=>nav("filters"));on("venues",()=>nav("venues"));on("back-result",()=>nav("result"));on("heart",()=>{if(current())fav(current().id)});on("veg",()=>set("veg",!state.veg));on("spicy",()=>set("spicy",!state.spicy));on("maps",openGoogleMaps);on("gps",gpsLocate);on("pick-map",openPicker);on("clear-location",()=>{liveLocation=null;state.gps="Đã quay về trung tâm khu vực được chọn (ước lượng).";render()});on("set-coords",setManualCoords);const area=document.getElementById("area");if(area)area.onchange=e=>set("area",e.target.value);const budget=document.getElementById("budget");if(budget)budget.oninput=e=>{state.budget=Number(e.target.value);document.querySelector("#budget-val").textContent=money(state.budget);save()};document.querySelectorAll("[data-category]").forEach(b=>b.onclick=()=>set("category",b.dataset.category));document.querySelectorAll("[data-distance]").forEach(b=>b.onclick=()=>set("distance",Number(b.dataset.distance)));document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{state.last=Number(b.dataset.view);nav("result")})}
+function bind(){const on=(id,cb)=>{const el=document.getElementById(id);if(el)el.addEventListener("click",cb)};on("start",()=>nav("filters"));on("choose",choose);on("again",choose);on("edit",()=>nav("filters"));on("venues",()=>nav("venues"));on("back-result",()=>nav("result"));on("heart",()=>{if(current())fav(current().id)});on("reset-filters",reset);document.querySelectorAll("[data-pref]").forEach(b=>b.onclick=()=>set(b.dataset.pref,b.dataset.value));document.querySelectorAll("[data-avoid]").forEach(b=>b.onclick=()=>toggleAvoid(b.dataset.avoid));on("maps",openGoogleMaps);on("gps",gpsLocate);on("pick-map",openPicker);on("clear-location",()=>{liveLocation=null;state.gps="Đã quay về trung tâm khu vực được chọn (ước lượng).";render()});on("set-coords",setManualCoords);const area=document.getElementById("area");if(area)area.onchange=e=>set("area",e.target.value);const budget=document.getElementById("budget");if(budget)budget.oninput=e=>{state.budget=Number(e.target.value);document.querySelector("#budget-val").textContent=money(state.budget);const summary=document.querySelector(".summary");if(summary){const n=pool().length;summary.querySelector("b").textContent=n+" / "+DISHES.length+" món";document.getElementById("choose").disabled=n===0;}save()};document.querySelectorAll("[data-distance]").forEach(b=>b.onclick=()=>set("distance",Number(b.dataset.distance)));document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{state.last=Number(b.dataset.view);nav("result")})}
 document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>nav(b.dataset.nav));document.querySelector("#logo").onclick=()=>nav("home");render();
