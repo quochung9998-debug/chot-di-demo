@@ -175,14 +175,16 @@ function foodPicture(d,large=false){
 function photoCredit(d){
  return '<div class="food-credit" data-food-credit="'+d.id+'">Ảnh minh họa: Wikimedia Commons (nếu có ảnh phù hợp)</div>';
 }
-let photoQueue=Promise.resolve();
+let photoActive=0; const photoPending=[];
+function schedulePhoto(task){return new Promise(resolve=>{photoPending.push({task,resolve});flushPhotos()})}
+function flushPhotos(){while(photoActive<3&&photoPending.length){const job=photoPending.shift();photoActive++;Promise.resolve().then(job.task).then(job.resolve,()=>job.resolve(null)).finally(()=>{photoActive--;flushPhotos()})}}
 function requestPhoto(d){
  if(photoCache.has(d.id))return Promise.resolve(photoCache.get(d.id));
  const task=async()=>{
    if(photoCache.has(d.id))return photoCache.get(d.id);
    try{
      const qs=new URLSearchParams({action:"query",format:"json",generator:"search",
-       gsrsearch:d.imageQuery+" food",gsrnamespace:"6",gsrlimit:"5",
+       gsrsearch:d.imageQuery,gsrnamespace:"6",gsrlimit:"8",
        prop:"imageinfo",iiprop:"url|extmetadata",iiurlwidth:"640",origin:"*"});
      const ctrl=new AbortController();
      const timer=setTimeout(()=>ctrl.abort(),8500);
@@ -202,7 +204,10 @@ function requestPhoto(d){
        const key=d.imageQuery.split(" ")[0].toLowerCase();
        return Number(bb.includes(key))-Number(aa.includes(key));
      });
-     const page=candidates[0],info=page&&page.imageinfo[0];
+     const normalized=q=>q.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9 ]/g," ").trim();
+     const terms=normalized(d.imageQuery).split(/\s+/).filter(w=>w.length>2&&w!=="vietnamese"&&w!=="food");
+     const best=candidates.map(p=>({p,score:terms.filter(t=>normalized(p.title).includes(t)).length})).sort((a,b)=>b.score-a.score)[0];
+     const page=best&&best.score>=Math.min(2,terms.length)?best.p:null,info=page&&page.imageinfo[0];
      if(!info){photoCache.set(d.id,null);return null}
      const m=info.extmetadata||{};
      const photo={url:info.thumburl,page:info.descriptionurl||"https://commons.wikimedia.org/wiki/"+encodeURIComponent(page.title.replace(/ /g,"_")),
@@ -212,7 +217,7 @@ function requestPhoto(d){
    }catch{photoCache.set(d.id,null);return null}
  };
  // Limit concurrent metadata requests to protect Commons and mobile performance.
- const result=photoQueue.then(task,task);photoQueue=result.then(()=>{},()=>{});return result;
+ return schedulePhoto(task);
 }
 function hydratePhotoNode(el){
  if(el.dataset.loaded)return;
