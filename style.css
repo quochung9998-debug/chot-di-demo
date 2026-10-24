@@ -32,3 +32,44 @@
 .food-credit{font-size:11px;color:#968272;overflow-wrap:anywhere;border-top:1px solid #f1e6da;margin-top:12px;padding-top:10px}
 .food-credit a{color:#df601e;text-decoration:underline}
 @media(max-width:375px){.food-card strong{font-size:12px}.photo-box .photo-emoji{font-size:34px}}
+
+/* CHOT DI minimal UX, October 2026 */
+.minimal-page{padding:24px 20px 35px}
+.minimal-page h2{font-size:27px;line-height:1.25;letter-spacing:-.7px}
+.stepper{display:flex;align-items:center;gap:14px;margin-bottom:22px;color:#ee6726;font-weight:900;font-size:11px;letter-spacing:1px}
+.step-track{height:5px;flex:1;border-radius:9px;background:#f1e8e1;overflow:hidden}
+.step-track i{display:block;background:#fa692b;width:50%;height:100%;border-radius:9px}
+.step-track.complete i{width:100%}
+.gps-card{background:#fff7ed;border:1px solid #fae7d7;border-radius:20px;padding:16px;margin:23px 0}
+.gps-card strong{font-size:14px}
+.gps-status{color:#348e55;font-size:11px;white-space:nowrap}
+.gps-message{font-size:11px;margin:9px 0;color:#a26c41}
+.gps-manual{margin-top:10px;color:#928172;font-size:11px}
+.gps-manual summary{cursor:pointer;padding:4px 0}
+.simple-heading{font-size:11px;letter-spacing:1px;font-weight:900;color:#7d746b;border-left:3px solid #fa692b;padding-left:10px;margin:23px 0 14px}
+.simple-filter{border:1px solid #f1e7df;padding:16px;border-radius:19px;margin-bottom:13px;background:#fff}
+.simple-filter h3{font-size:15px;margin-bottom:16px}
+.simple-filter .chips{gap:8px}
+.simple-filter .chip{min-height:43px}
+.range-value{text-align:center;color:#f36928;font-weight:900;font-size:20px;margin:0 0 10px}
+.simple-filter input[type="range"]{accent-color:#f46b20}
+.match-note{font-size:12px;margin:18px 0 10px;text-align:center}
+.big-cta{min-height:59px;border-radius:20px;font-size:15px;margin:12px 0 6px}
+.dish-spotlight{margin:15px 0 18px}
+.dish-spotlight .photo-box.large{max-width:none;aspect-ratio:16/10;border-radius:19px;margin:0 auto 12px}
+.dish-spotlight h2{font-size:26px}
+.price-pill{font-size:13px;background:#fff0e6;color:#ea6122;border-radius:30px;padding:10px 12px;font-weight:800;white-space:nowrap;margin-top:8px}
+.dish-spotlight p{font-size:13px;margin:8px 0}
+.nearby-panel{border:1px solid #f0e6da;border-radius:21px;padding:15px;margin:20px 0 15px;background:#fff}
+.nearby-panel h3{font-size:17px}
+.mini-map{height:205px;background:#f5f1e9;border-radius:15px;overflow:hidden;margin:14px 0}
+.nearby-item{display:flex;gap:10px;align-items:center;border-top:1px solid #f3eee8;padding:13px 0}
+.nearby-item .rank{display:flex;align-items:center;justify-content:center;border-radius:50%;width:26px;height:26px;flex-shrink:0;background:#fa692b;color:white;font-size:12px;font-weight:900}
+.nearby-text{flex:1;min-width:0}
+.nearby-text b{font-size:13px;display:block;overflow-wrap:anywhere}
+.nearby-text small{font-size:11px;color:#948477;display:block;margin-top:4px}
+.nearby-item .btn{box-shadow:none;font-size:11px}
+.map-feedback,.empty-nearby{font-size:13px;line-height:1.6;color:#756d63;margin:12px 0}
+.map-feedback button{display:block;margin-top:12px}
+.nearby-panel .gps-card{padding:12px}
+@media(max-width:390px){.minimal-page{padding:20px 14px}.simple-filter{padding:12px}.nearby-panel{padding:11px}.nearby-item{gap:6px}.nearby-item .btn{padding:8px}}
