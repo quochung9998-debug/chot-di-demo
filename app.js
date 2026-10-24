@@ -277,7 +277,7 @@ function choose(){
  let fresh=available.filter(d=>!state.excluded.includes(d.id));
  if(!fresh.length){state.excluded=[];fresh=available}
  const item=fresh[Math.floor(Math.random()*fresh.length)];
- state.excluded.push(item.id);state.last=item.id;state.notice="";
+ state.excluded.push(item.id);state.last=item.id;state.notice="";nearbyExpanded=false;
  state.history.unshift({id:item.id,at:new Date().toISOString(),area:state.area});
  state.history=state.history.slice(0,30);save();nav("result");
 }
@@ -315,8 +315,9 @@ function result(){
  '<div class="row between" style="align-items:start;gap:8px"><h2 style="margin:10px 0">'+d.name+'</h2><span class="price-pill">'+money(d.price)+'</span></div>'+
  '<p>'+d.description+'</p><p class="muted"><b>Xuất xứ:</b> '+d.region+'. '+d.origin+'</p>'+
  '<div class="row"><button class="btn ghost sm" id="again">↻ CHỐT LẠI</button><button class="btn ghost sm" id="heart">'+(state.favorites.includes(d.id)?'♥ Đã lưu':'♡ Yêu thích')+'</button></div></div>'+
+ '<button class="btn full big-cta" id="maps">↗ TÌM QUÁN TRÊN GOOGLE MAPS</button>'+
+ '<p class="muted" style="font-size:12px">Mở ngay kết quả tìm món quanh vị trí bạn chọn. Không cần chờ tải danh sách.</p>'+
  nearbySection(d)+
- '<button class="btn full big-cta" id="maps">↗ TÌM TRÊN GOOGLE MAPS</button>'+
  '<p class="fine">Quán được tìm qua OpenStreetMap, không đảm bảo còn mở cửa hoặc bán đúng món. Khoảng cách là đường chim bay. Giá món mang tính tham khảo.</p></section>';
 }
 function places(){return result()}
@@ -324,6 +325,7 @@ function places(){return result()}
 /* Nearby venues are real OSM records, if public Overpass servers respond.
    Never display invented restaurant names or assume an eatery serves the chosen dish. */
 let nearby={key:"",status:"idle",items:[],error:""};
+let nearbyExpanded=false;
 function clean(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function distanceMeters(a,b,c,d){
  const rad=Math.PI/180;const q=2*Math.asin(Math.sqrt(Math.sin((c-a)*rad/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin((d-b)*rad/2)**2));
@@ -333,15 +335,16 @@ function formatDistance(m){return m<1000?m+"m":(m/1000).toLocaleString("vi-VN",{
 function osmKeyword(d){const q=d.name.toLowerCase();if(q.includes("mì cay"))return ["mì cay","mi cay","korean","seoul","sasin"];if(q.includes("phở"))return ["phở","pho"];if(q.includes("cơm tấm"))return ["cơm tấm","com tam"];if(q.includes("bún bò"))return ["bún bò","bun bo"];if(q.includes("bánh mì"))return ["bánh mì","banh mi"];if(q.includes("sushi"))return ["sushi","japanese"];if(q.includes("pizza"))return ["pizza","italian"];return [q,q.normalize("NFD").replace(/[\u0300-\u036f]/g,"")]}
 function nearbySection(d){
  const loc=liveLocation,match=nearby.key===venueKey(d);
- return '<div class="nearby-panel"><div class="row between"><h3 style="margin:0">📍 Quán gần bạn</h3><span class="muted">Gần → xa</span></div>'+
- '<p class="muted">Tìm từ dữ liệu địa điểm cộng đồng OpenStreetMap.</p>'+
+ return '<div class="nearby-panel"><div class="row between"><h3 style="margin:0">📍 Bản đồ & quán gần bạn</h3><span class="muted">Tùy chọn miễn phí</span></div>'+
+ '<p class="muted">Danh sách OpenStreetMap chỉ để tham khảo và có thể thiếu quán. Google Maps vẫn là lựa chọn tìm kiếm chính.</p>'+
+ (!nearbyExpanded?'<button class="btn ghost full" id="show-nearby">Xem bản đồ và quán có dữ liệu ↘</button>':
  '<div id="nearby-map" class="mini-map" aria-label="Bản đồ địa điểm quanh bạn"></div>'+
- (!loc?'<div class="empty-nearby"><b>Chưa có vị trí</b><p>Hãy lấy GPS hoặc ghim điểm để tìm quán xung quanh.</p>'+locationSummary()+'</div>':
- !match||nearby.status==="loading"?'<p class="map-feedback">Đang tra cứu quán (tối đa khoảng 7 giây). Bạn có thể mở Google Maps ngay.</p>':
- nearby.status==="error"?'<div class="map-feedback">Chưa tải được danh sách quán miễn phí. '+clean(nearby.error)+'<button class="btn ghost sm" id="retry-venues">Thử lại</button></div>':
- nearby.items.length===0?'<div class="map-feedback">Chưa tìm thấy quán có tên hoặc nhóm ẩm thực khớp với món này trong dữ liệu OpenStreetMap. Bạn có thể tìm rộng hơn trên Google Maps.</div>':
- nearby.items.map((p,i)=>'<div class="nearby-item"><span class="rank">'+(i+1)+'</span><div class="nearby-text"><b>'+clean(p.name)+'</b><small>'+formatDistance(p.meters)+' · '+(p.confidence==="name"?"Tên quán liên quan đến món":"Ẩm thực có thể phù hợp")+'</small></div><button type="button" class="btn ghost sm" data-directions="'+i+'">Chỉ đường ↗</button></div>').join("")
- )+
+ (!loc?'<div class="empty-nearby"><b>Chưa xác định vị trí</b><p>Hãy lấy GPS hoặc chọn vị trí thủ công để xem địa điểm trên bản đồ.</p>'+locationSummary()+'</div>':
+ !match||nearby.status==="loading"?'<p class="map-feedback">Đang tải danh sách tham khảo. Bạn vẫn có thể mở Google Maps ngay ở phía trên.</p>':
+ nearby.status==="error"?'<div class="map-feedback">'+clean(nearby.error)+'<button class="btn ghost sm" id="retry-venues">Thử tải lại</button></div>':
+ nearby.items.length===0?'<div class="map-feedback">OpenStreetMap chưa có quán được gắn tên liên quan đến món này trong khu vực. Dùng Google Maps để xem thêm.</div>':
+ nearby.items.map((p,i)=>'<div class="nearby-item"><span class="rank">'+(i+1)+'</span><div class="nearby-text"><b>'+clean(p.name)+'</b><small>'+formatDistance(p.meters)+' · Tên quán liên quan, chưa xác minh thực đơn</small></div><button type="button" class="btn ghost sm" data-directions="'+i+'">Chỉ đường ↗</button></div>').join("")
+ )+'<button class="btn ghost full" id="hide-nearby">Thu gọn bản đồ ↑</button>')+
  '</div>';
 }
 function venueKey(d){return d.id+"|"+(liveLocation?liveLocation.lat.toFixed(4)+","+liveLocation.lng.toFixed(4):"none")}
@@ -390,7 +393,7 @@ async function fetchNearby(force=false){
 }
 let previewMap=null;
 async function hydrateNearby(){
- if(state.screen!=="result")return;
+ if(state.screen!=="result"||!nearbyExpanded)return;
  const d=current();if(!d)return;
  if(liveLocation){
   if(nearby.key!==venueKey(d)||nearby.status==="idle"){fetchNearby();return}
@@ -416,5 +419,5 @@ function directions(index){
 function collection(kind){const hs=kind==="history"?state.history.map(v=>({...v,d:DISHES.find(d=>d.id===v.id)})):state.favorites.map(id=>({id,d:DISHES.find(d=>d.id===id)}));const title=kind==="history"?"Lịch sử CHỐT":"Món yêu thích";return '<section class="page"><div class="eyebrow">Bộ sưu tập của bạn</div><h2>'+title+'</h2><p>'+(kind==="history"?"Các món bạn từng CHỐT, lưu trên thiết bị hiện tại.":"Danh sách món bạn đã thả tim, lưu trên thiết bị hiện tại.")+'</p>'+(hs.length?hs.filter(x=>x.d).map(v=>'<div class="card item"><span class="icon">'+v.d.emoji+'</span><div class="text"><h3>'+v.d.name+'</h3><p>'+money(v.d.price)+(v.at?' · '+new Date(v.at).toLocaleDateString("vi-VN"):'')+'</p></div><button class="btn sm ghost" data-view="'+v.d.id+'">Xem →</button></div>').join(""):'<div class="empty"><div class="big">🍜</div><h3>Chưa có món nào</h3><p>Hãy bắt đầu CHỐT một món để lưu vào đây.</p><button class="btn" id="start">CHỐT NGAY</button></div>')+'</section>'}
 function explore(){return '<section class="page"><div class="eyebrow">Khám phá ẩm thực</div><h2>'+DISHES.length+' món ăn, <span class="accent">có gì thú vị?</span></h2><p>Chọn món để xem hình ảnh thực tế, nguồn gốc và câu chuyện ẩm thực. Ảnh minh họa lấy từ Wikimedia Commons, tùy độ sẵn có và kết nối mạng.</p><div class="grid food-grid">'+DISHES.map(d=>'<div class="feature food-card">'+foodPicture(d)+'<strong>'+d.name+'</strong><p class="muted">'+d.region+'</p><p style="margin-bottom:9px">'+money(d.price)+'</p><button class="btn ghost sm" data-view="'+d.id+'">Chi tiết →</button></div>').join("")+'</div></section>'}
 function render(){app.innerHTML=state.screen==="home"?home():state.screen==="filters"?filterPage():state.screen==="result"?result():state.screen==="venues"?places():state.screen==="explore"?explore():state.screen==="history"?collection("history"):collection("favorites");document.querySelectorAll("[data-nav]").forEach(b=>b.classList.toggle("active",b.dataset.nav===state.screen||(state.screen==="filters"||state.screen==="result"||state.screen==="venues")&&b.dataset.nav==="home"));bind();hydratePhotos();hydrateNearby()}
-function bind(){const on=(id,cb)=>{const el=document.getElementById(id);if(el)el.addEventListener("click",cb)};on("start",()=>{nav("filters");if(!liveLocation)gpsLocate()});on("choose",choose);on("again",choose);on("edit",()=>nav("filters"));on("venues",()=>nav("result"));on("back-result",()=>nav("result"));on("heart",()=>{if(current())fav(current().id)});on("retry-venues",()=>fetchNearby(true));document.querySelectorAll("[data-directions]").forEach(b=>b.onclick=()=>directions(Number(b.dataset.directions)));on("reset-filters",reset);document.querySelectorAll("[data-pref]").forEach(b=>b.onclick=()=>set(b.dataset.pref,b.dataset.value));document.querySelectorAll("[data-avoid]").forEach(b=>b.onclick=()=>toggleAvoid(b.dataset.avoid));on("maps",openGoogleMaps);on("gps",gpsLocate);on("pick-map",openPicker);on("clear-location",()=>{liveLocation=null;state.gps="Hãy cấp quyền GPS hoặc chọn điểm trên bản đồ.";render()});on("set-coords",setManualCoords);const budget=document.getElementById("budget");if(budget)budget.oninput=e=>{state.budget=Number(e.target.value);document.querySelector("#budget-val").textContent=money(state.budget);const note=document.getElementById("match-note");if(note){const n=pool().length;note.textContent=n+" món phù hợp với lựa chọn hiện tại";document.getElementById("choose").disabled=n===0;}save()};document.querySelectorAll("[data-distance]").forEach(b=>b.onclick=()=>set("distance",Number(b.dataset.distance)));document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{state.last=Number(b.dataset.view);nav("result")})}
+function bind(){const on=(id,cb)=>{const el=document.getElementById(id);if(el)el.addEventListener("click",cb)};on("start",()=>{nav("filters");if(!liveLocation)gpsLocate()});on("choose",choose);on("again",choose);on("edit",()=>nav("filters"));on("venues",()=>nav("result"));on("back-result",()=>nav("result"));on("heart",()=>{if(current())fav(current().id)});on("show-nearby",()=>{nearbyExpanded=true;render()});on("hide-nearby",()=>{nearbyExpanded=false;if(previewMap){previewMap.remove();previewMap=null;}render()});on("retry-venues",()=>fetchNearby(true));document.querySelectorAll("[data-directions]").forEach(b=>b.onclick=()=>directions(Number(b.dataset.directions)));on("reset-filters",reset);document.querySelectorAll("[data-pref]").forEach(b=>b.onclick=()=>set(b.dataset.pref,b.dataset.value));document.querySelectorAll("[data-avoid]").forEach(b=>b.onclick=()=>toggleAvoid(b.dataset.avoid));on("maps",openGoogleMaps);on("gps",gpsLocate);on("pick-map",openPicker);on("clear-location",()=>{liveLocation=null;state.gps="Hãy cấp quyền GPS hoặc chọn điểm trên bản đồ.";render()});on("set-coords",setManualCoords);const budget=document.getElementById("budget");if(budget)budget.oninput=e=>{state.budget=Number(e.target.value);document.querySelector("#budget-val").textContent=money(state.budget);const note=document.getElementById("match-note");if(note){const n=pool().length;note.textContent=n+" món phù hợp với lựa chọn hiện tại";document.getElementById("choose").disabled=n===0;}save()};document.querySelectorAll("[data-distance]").forEach(b=>b.onclick=()=>set("distance",Number(b.dataset.distance)));document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{state.last=Number(b.dataset.view);nav("result")})}
 document.querySelectorAll("[data-nav]").forEach(b=>b.onclick=()=>nav(b.dataset.nav));document.querySelector("#logo").onclick=()=>nav("home");render();
