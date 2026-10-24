@@ -337,7 +337,7 @@ function nearbySection(d){
  '<p class="muted">Tìm từ dữ liệu địa điểm cộng đồng OpenStreetMap.</p>'+
  '<div id="nearby-map" class="mini-map" aria-label="Bản đồ địa điểm quanh bạn"></div>'+
  (!loc?'<div class="empty-nearby"><b>Chưa có vị trí</b><p>Hãy lấy GPS hoặc ghim điểm để tìm quán xung quanh.</p>'+locationSummary()+'</div>':
- !match||nearby.status==="loading"?'<p class="map-feedback">Đang tìm địa điểm gần vị trí của bạn…</p>':
+ !match||nearby.status==="loading"?'<p class="map-feedback">Đang tra cứu quán (tối đa khoảng 7 giây). Bạn có thể mở Google Maps ngay.</p>':
  nearby.status==="error"?'<div class="map-feedback">Chưa tải được danh sách quán miễn phí. '+clean(nearby.error)+'<button class="btn ghost sm" id="retry-venues">Thử lại</button></div>':
  nearby.items.length===0?'<div class="map-feedback">Chưa tìm thấy quán có tên hoặc nhóm ẩm thực khớp với món này trong dữ liệu OpenStreetMap. Bạn có thể tìm rộng hơn trên Google Maps.</div>':
  nearby.items.map((p,i)=>'<div class="nearby-item"><span class="rank">'+(i+1)+'</span><div class="nearby-text"><b>'+clean(p.name)+'</b><small>'+formatDistance(p.meters)+' · '+(p.confidence==="name"?"Tên quán liên quan đến món":"Ẩm thực có thể phù hợp")+'</small></div><button type="button" class="btn ghost sm" data-directions="'+i+'">Chỉ đường ↗</button></div>').join("")
@@ -345,35 +345,48 @@ function nearbySection(d){
  '</div>';
 }
 function venueKey(d){return d.id+"|"+(liveLocation?liveLocation.lat.toFixed(4)+","+liveLocation.lng.toFixed(4):"none")}
+
+const venueCache=new Map();
+let requestSerial=0;
 async function fetchNearby(force=false){
  const d=current(),loc=liveLocation;if(!d||!loc)return;
- const key=venueKey(d);if(!force&&key===nearby.key&&nearby.status==="ready")return;
+ const key=venueKey(d);
+ if(!force&&nearby.key===key&&(nearby.status==="ready"||nearby.status==="loading"))return;
+ if(!force&&venueCache.has(key)){
+  nearby={key,status:"ready",items:venueCache.get(key),error:""};render();return;
+ }
+ const requestId=++requestSerial;
  nearby={key,status:"loading",items:[],error:""};render();
- const rad=Math.min(Math.max(state.distance||3,1),5)*1000;
- const query='[out:json][timeout:14];(nwr(around:'+rad+','+loc.lat+','+loc.lng+')[amenity~"restaurant|fast_food|cafe|food_court"];);out center 200;';
- const urls=["https://overpass.kumi.systems/api/interpreter","https://overpass-api.de/api/interpreter"];
+ const rad=2200;
+ const keywords=osmKeyword(d).filter(w=>w.length>=3).slice(0,4);
+ const expr=keywords.map(w=>w.replace(/[^a-zA-Z0-9À-ỹ ]/g,"")).filter(Boolean).join("|");
+ const query='[out:json][timeout:7];(nwr(around:'+rad+','+loc.lat.toFixed(5)+','+loc.lng.toFixed(5)+')[amenity~"restaurant|fast_food|food_court"][name~"'+expr+'",i];);out center 40;';
+ const endpoints=["https://overpass.kumi.systems/api/interpreter","https://overpass-api.de/api/interpreter"];
+ const fetchOne=async url=>{
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);
+  try{
+   const res=await fetch(url+"?data="+encodeURIComponent(query),{signal:controller.signal});
+   if(!res.ok)throw Error("HTTP "+res.status);
+   const data=await res.json();
+   if(!data||!Array.isArray(data.elements))throw Error("Invalid response");
+   return data.elements;
+  }finally{clearTimeout(timer)}
+ };
  try{
-  let data=null;
-  for(const u of urls){try{
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
-   let res;try{res=await fetch(u,{method:"POST",body:"data="+encodeURIComponent(query),headers:{"Content-Type":"application/x-www-form-urlencoded"},signal:controller.signal})}finally{clearTimeout(timer)}
-   if(res.ok){data=await res.json();break}
-  }catch{}}
-  if(!data)throw Error("Máy chủ cộng đồng đang bận.");
-  const words=osmKeyword(d);
-  const all=(data.elements||[]).map(e=>{
+  const elements=await Promise.any(endpoints.map(fetchOne));
+  if(requestId!==requestSerial||venueKey(d)!==key)return;
+  const rows=elements.map(e=>{
    const t=e.tags||{},name=t.name||t["name:vi"]||"";
    const lat=e.lat??e.center?.lat,lng=e.lon??e.center?.lon;
    if(!name||!Number.isFinite(lat)||!Number.isFinite(lng))return null;
-   const n=(name+" "+(t.cuisine||"")).toLocaleLowerCase("vi");
-   const nameMatch=words.some(w=>name.toLocaleLowerCase("vi").includes(w));
-   const cuisineMatch=words.some(w=>n.includes(w));
-   if(!cuisineMatch)return null;
-   return {name,lat,lng,id:e.type+"/"+e.id,meters:distanceMeters(loc.lat,loc.lng,lat,lng),confidence:nameMatch?"name":"category"};
-  }).filter(Boolean).sort((a,b)=>a.meters-b.meters);
-  if(venueKey(d)!==key)return;
-  nearby={key,status:"ready",items:all.slice(0,8),error:""};render();
- }catch(e){if(venueKey(d)!==key)return;nearby={key,status:"error",items:[],error:e.message};render()}
+   return {name,lat,lng,id:e.type+"/"+e.id,meters:distanceMeters(loc.lat,loc.lng,lat,lng),confidence:"name"};
+  }).filter(Boolean).sort((a,b)=>a.meters-b.meters).slice(0,8);
+  venueCache.set(key,rows);
+  nearby={key,status:"ready",items:rows,error:""};render();
+ }catch(e){
+  if(requestId!==requestSerial||venueKey(d)!==key)return;
+  nearby={key,status:"error",items:[],error:"Máy chủ địa điểm cộng đồng phản hồi chậm. Có thể tìm quán ngay trên Google Maps."};render();
+ }
 }
 let previewMap=null;
 async function hydrateNearby(){
@@ -388,7 +401,7 @@ async function hydrateNearby(){
  try{
   await loadLeaflet();if(!el.isConnected||state.screen!=="result")return;
   const c=coordinates();previewMap=L.map(el,{zoomControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false}).setView([c.lat,c.lng],14);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(previewMap);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,attribution:"© OpenStreetMap © CARTO"}).addTo(previewMap);
   if(liveLocation)L.circleMarker([c.lat,c.lng],{radius:9,color:"#fff",weight:3,fillColor:"#2e81e8",fillOpacity:1}).addTo(previewMap);
   if(nearby.key===venueKey(d))nearby.items.forEach((p,i)=>L.marker([p.lat,p.lng]).addTo(previewMap).bindPopup(clean(p.name)));
   setTimeout(()=>{if(previewMap&&el.isConnected)previewMap.invalidateSize()},120);
